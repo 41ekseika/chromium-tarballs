@@ -77,37 +77,17 @@ jobs:
             compression-level: 0 # Tarballs are already compressed
             retention-days: 5
 
-      # Using pinned commit hash for IRC action as preferred for security/stability.
-      - name: Notify success (Generation)
-        if: success() && github.repository == 'chromium-linux-tarballs/chromium-tarballs'
-        continue-on-error: true
-        uses: Gottox/irc-message-action@5ab60c2121053c99a383753390fb169a0045694d # v2.1.5
-        with:
-          server: irc.libera.chat
-          notice: false
-          channel: "#gentoo-chromium"
-          nickname: chromium-notifs
-          message: "✅ Successfully generated Chromium tarballs for ${{ inputs.version || github.ref_name }} (${{ steps.get_release_info.outputs.channel }})"
-
-      - name: Notify failure (Generation)
-        if: (failure() || cancelled()) && github.repository == 'chromium-linux-tarballs/chromium-tarballs'
-        uses: Gottox/irc-message-action@5ab60c2121053c99a383753390fb169a0045694d # v2.1.5
-        with:
-          server: irc.libera.chat
-          notice: false
-          channel: "#gentoo-chromium"
-          nickname: chromium-notifs
-          message: "❌ Failed to generate Chromium tarballs for ${{ inputs.version || github.ref_name }} (${{ steps.get_release_info.outputs.channel }})"
-
   # Create GitHub Release and upload artefacts directly to it.
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [generate-tarball]
+    permissions:
+      contents: write
 
     steps:
       - name: Download build artefacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-artefacts
 
@@ -116,7 +96,7 @@ jobs:
 
       - name: Create Release and Upload Artefacts
         id: create_release
-        uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174 # v1.16.0
+        uses: ncipollo/release-action@v1.21.0
         with:
           # Attach files matching this pattern from the workspace to the release
           artifacts: "chromium*.tar.xz*"
@@ -125,28 +105,8 @@ jobs:
           allowUpdates: true # Allow modifying existing releases for the same tag
           # Mark as pre-release if the channel is not 'stable'
           prerelease: ${{ needs.generate-tarball.outputs.channel != 'stable' }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ inputs.version || github.ref_name }}
           name: ${{ needs.generate-tarball.outputs.annotation }}
           body: |
             **Artefacts are attached directly to this GitHub release.**
-      - name: Notify success (Release)
-        if: success() && github.repository == 'chromium-linux-tarballs/chromium-tarballs'
-        continue-on-error: true
-        uses: Gottox/irc-message-action@5ab60c2121053c99a383753390fb169a0045694d # v2.1.5
-        with:
-          server: irc.libera.chat
-          notice: false
-          channel: "#gentoo-chromium"
-          nickname: chromium-notifs
-          message: "✅ Successfully created GH release for Chromium tarballs @ ${{ inputs.version || github.ref_name }} ${{ needs.generate-tarball.outputs.channel && format('({0})', needs.generate-tarball.outputs.channel)}}"
-
-      - name: Notify failure (Release)
-        if: (failure() || cancelled()) && github.repository == 'chromium-linux-tarballs/chromium-tarballs'
-        uses: Gottox/irc-message-action@5ab60c2121053c99a383753390fb169a0045694d # v2.1.5
-        with:
-          server: irc.libera.chat
-          notice: false
-          channel: "#gentoo-chromium"
-          nickname: chromium-notifs
-          message: "❌ Failed to create (or update) GH release for Chromium tarballs @ ${{ inputs.version || github.ref_name }} ${{ needs.generate-tarball.outputs.channel && format('({0})', needs.generate-tarball.outputs.channel)}}"
